@@ -1,18 +1,17 @@
-name: HKJC Triple Trio Bot
+name: HKJC Assistant Bot
 
 on:
   schedule:
-    - cron: '15 15 * * 0,3'
+    # 每日香港時間 23:15 (UTC 15:15)
+    - cron: '15 15 * * *'
   workflow_dispatch: 
 
-# 新增呢部分嚟消除 Node.js 20 嘅警告
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
   build:
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -23,14 +22,10 @@ jobs:
           python-version: '3.11'
 
       - name: Install dependencies
-        run: |
-          pip install requests beautifulsoup4
+        run: pip install requests beautifulsoup4
 
       - name: Run Python script
         env:
           TG_TOKEN: ${{ secrets.TG_TOKEN }}
           TG_CHAT_ID: ${{ secrets.TG_CHAT_ID }}
-        # ⚠️ 請再次確保呢個檔名同你 Repository 入面嗰個完全一樣！
         run: python hkjc_tt_bot.py
-
-
