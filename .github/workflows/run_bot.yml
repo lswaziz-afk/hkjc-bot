@@ -2,7 +2,7 @@ name: HKJC Triple Trio Bot
 
 on:
   schedule:
-    - cron: '0 15 * * 0,3'
+    - cron: '15 15 * * 0,3'
   workflow_dispatch: 
 
 # 新增呢部分嚟消除 Node.js 20 嘅警告
