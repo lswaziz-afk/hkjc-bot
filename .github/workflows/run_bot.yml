@@ -27,4 +27,4 @@ jobs:
           TG_TOKEN: ${{ secrets.TG_TOKEN }}
           TG_CHAT_ID: ${{ secrets.TG_CHAT_ID }}
         # ⚠️ 請確保下面呢個檔名，同你 Repository 入面嗰個一模一樣！
-        run: python hkjc_tt_bot.py
+        run: python hkjc_tt.py
