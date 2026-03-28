@@ -68,5 +68,6 @@ def send_to_telegram(text):
         print(f"❌ 連線出錯：{e}")
 if __name__ == "__main__":
     print("正在檢查馬會賽果...")
-    tt_msg = get_hkjc_tt_data()
+    tt_msg = get_hkjc_tt_data()  # 攞返馬會數據
     send_to_telegram(tt_msg)
+
