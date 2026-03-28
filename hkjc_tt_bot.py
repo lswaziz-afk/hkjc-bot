@@ -40,24 +40,32 @@ def get_hkjc_tt_data():
         return f"❌ 爬蟲出錯：{e}"
 
 def send_to_telegram(text):
+    # 1. 檢查變數有無讀到 (GitHub 會自動將內容打星號，所以安全)
+    print(f"DEBUG: BOT_TOKEN is {'Set' if BOT_TOKEN else 'None'}")
+    print(f"DEBUG: CHAT_ID is {'Set' if CHAT_ID else 'None'}")
+
+    # 2. 確保 URL 格式完全正確
+    # 注意：bot 呢個字必須喺變數前面
     api_url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+    
     payload = {
         'chat_id': CHAT_ID,
         'text': text,
         'parse_mode': 'Markdown'
     }
+
     try:
-        # 加咗 timeout=10，10秒連唔到就會彈出嚟
-        r = requests.post(api_url, data=payload, timeout=10) 
+        # 3. 增加 timeout 同埋直接印出 Response
+        r = requests.post(api_url, data=payload, timeout=15)
+        print(f"DEBUG: Status Code = {r.status_code}")
+        print(f"DEBUG: Response = {r.text}")
+        
         if r.status_code == 200:
             print("✅ 成功發送短訊去 Telegram！")
         else:
-            print(f"❌ 發送失敗，回應碼：{r.status_code}，原因：{r.text}")
-    except requests.exceptions.Timeout:
-        print("❌ 連線超時：連唔到 Telegram 伺服器，請檢查網絡。")
+            print(f"❌ 發送失敗，請檢查 Token 格式。")
     except Exception as e:
-        print(f"❌ Telegram 連線錯誤：{e}")
-
+        print(f"❌ 連線出錯：{e}")
 if __name__ == "__main__":
     print("正在檢查馬會賽果...")
     tt_msg = get_hkjc_tt_data()
