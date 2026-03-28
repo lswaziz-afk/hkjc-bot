@@ -7,8 +7,9 @@ BOT_TOKEN = os.environ.get('TG_TOKEN')
 CHAT_ID = os.environ.get('TG_CHAT_ID')
 # ----------------------
 
+from datetime import datetime
+
 def get_hkjc_tt_data():
-    """爬取馬會三T結果"""
     url = "https://racing.hkjc.com/racing/information/Chinese/Racing/LocalResults.aspx"
     headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
     
@@ -17,28 +18,45 @@ def get_hkjc_tt_data():
         response.encoding = 'utf-8'
         soup = BeautifulSoup(response.text, 'html.parser')
 
-        # 搜尋包含「三T」字眼的表格單元格
+        # 1. 檢查網頁顯示嘅賽馬日期
+        # 馬會網頁通常有個位寫住 "賽事日期: DD/MM/YYYY"
+        date_info = soup.find('span', text=lambda t: t and '賽事日期' in t)
+        if date_info:
+            race_date_str = date_info.get_text(strip=True).split(':')[-1].strip()
+            today_str = datetime.now().strftime('%d/%m/%Y')
+            
+            # 如果網頁日期唔係今日，代表今日無馬跑
+            if race_date_str != today_str:
+                print(f"今日 ({today_str}) 非賽馬日，跳過發送。")
+                return None
+
+        # 2. 搵三T數據 (原本嘅邏輯)
         all_tds = soup.find_all('td')
-        
         for i, td in enumerate(all_tds):
             text = td.get_text(strip=True)
             if "三T" == text:
-                # 根據馬會網頁結構，中獎號碼通常在下一格，派彩在再下一格
                 numbers = all_tds[i+1].get_text(strip=True)
                 dividend = all_tds[i+2].get_text(strip=True)
                 
-                msg = (f"🏇 【今日三T派彩結果】\n"
-                       f"━━━━━━━━━━━━━━\n"
-                       f"✅ 中獎組合：\n{numbers}\n\n"
-                       f"💰 每 $10 派彩：\nHK$ {dividend}\n"
-                       f"━━━━━━━━━━━━━━")
-                return msg
+                # 如果未出派彩 (顯示 "-")
+                if dividend == "-":
+                    return "⏳ 三T派彩仲計算緊，請稍後再手動檢查。"
+
+                return (f"🏇 【今日三T派彩結果】\n"
+                        f"━━━━━━━━━━━━━━\n"
+                        f"✅ 中獎組合：\n{numbers}\n\n"
+                        f"💰 每 $10 派彩：\nHK$ {dividend}\n"
+                        f"━━━━━━━━━━━━━━")
         
-        return "⚠️ 馬會網頁仲未更新三T派彩，請稍後再試。"
+        return None # 搵唔到三T，可能今日無呢項彩池
 
     except Exception as e:
         return f"❌ 爬蟲出錯：{e}"
 
+if __name__ == "__main__":
+    msg = get_hkjc_tt_data()
+    if msg: # 只有當 msg 有內容（唔係 None）先發送
+        send_to_telegram(msg)
 def send_to_telegram(text):
     # 1. 檢查變數有無讀到 (GitHub 會自動將內容打星號，所以安全)
     print(f"DEBUG: BOT_TOKEN is {'Set' if BOT_TOKEN else 'None'}")
