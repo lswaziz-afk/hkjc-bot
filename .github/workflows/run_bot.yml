@@ -2,10 +2,8 @@ name: HKJC Triple Trio Bot
 
 on:
   schedule:
-    # 呢度係 UTC 時間。香港 23:00 = UTC 15:00
-    # 設定為逢星期三、星期日行 (0=Sun, 3=Wed)
     - cron: '0 15 * * 0,3'
-  workflow_dispatch: # 俾你隨時喺 GitHub 網頁手動撳掣執行測試
+  workflow_dispatch: 
 
 jobs:
   build:
@@ -13,12 +11,12 @@ jobs:
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4 # 更新到 v4
 
       - name: Set up Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5 # 更新到 v5
         with:
-          python-version: '3.9'
+          python-version: '3.11'
 
       - name: Install dependencies
         run: |
@@ -28,4 +26,5 @@ jobs:
         env:
           TG_TOKEN: ${{ secrets.TG_TOKEN }}
           TG_CHAT_ID: ${{ secrets.TG_CHAT_ID }}
+        # ⚠️ 請確保下面呢個檔名，同你 Repository 入面嗰個一模一樣！
         run: python hkjc_tt_bot.py
