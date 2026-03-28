@@ -5,16 +5,20 @@ on:
     - cron: '0 15 * * 0,3'
   workflow_dispatch: 
 
+# 新增呢部分嚟消除 Node.js 20 嘅警告
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   build:
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4 # 更新到 v4
+        uses: actions/checkout@v4
 
       - name: Set up Python
-        uses: actions/setup-python@v5 # 更新到 v5
+        uses: actions/setup-python@v5
         with:
           python-version: '3.11'
 
@@ -26,5 +30,5 @@ jobs:
         env:
           TG_TOKEN: ${{ secrets.TG_TOKEN }}
           TG_CHAT_ID: ${{ secrets.TG_CHAT_ID }}
-        # ⚠️ 請確保下面呢個檔名，同你 Repository 入面嗰個一模一樣！
-        run: python hkjc_tt.py
+        # ⚠️ 請再次確保呢個檔名同你 Repository 入面嗰個完全一樣！
+        run: python hkjc_tt_bot.py
