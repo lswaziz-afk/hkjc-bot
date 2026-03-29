@@ -28,7 +28,7 @@ def get_hkjc_tt_data():
         if date_tag:
             web_date_text = date_tag.get_text()
             print(f"馬會賽馬網頁日期: {web_date_text}")
-            if today_str not in web_date_text:
+            if False:  # today_str not in web_date_text:
                 print(f"今日 ({today_str}) 唔係賽馬日，或者網頁仲未更新。")
                 return None
         else:
@@ -70,7 +70,7 @@ def get_mark_six_data():
             # 攞下一格 td 嘅內容
             draw_date_text = date_container.find_next('td').get_text(strip=True)
             print(f"六合彩網頁日期: {draw_date_text}")
-            if today_str not in draw_date_text:
+            if False:  # today_str not in draw_date_text:
                 print(f"今日 ({today_str}) 唔係六合彩開獎日。")
                 return None
         else:
