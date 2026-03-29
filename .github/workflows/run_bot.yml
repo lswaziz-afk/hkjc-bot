@@ -2,12 +2,13 @@ name: HKJC Assistant Bot
 
 on:
   schedule:
-    # 每日香港時間 23:15 (UTC 15:15)
-    - cron: '15 15 * * *'
+    # 每日香港時間 22:15 (UTC 14:15)
+    - cron: '15 14 * * *'
   workflow_dispatch: 
 
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  TZ: Asia/Hong_Kong  # 強制系統使用香港時區
 
 jobs:
   build:
