@@ -4,12 +4,11 @@ import os
 import re
 from datetime import datetime
 
-# 讀取 GitHub Secrets
 BOT_TOKEN = os.environ.get('TG_TOKEN')
 CHAT_ID = os.environ.get('TG_CHAT_ID')
 
 def get_hkjc_tt_data():
-    """爬取三T結果 (Racing 頁面)"""
+    """爬取三T (維持馬會資訊網，通常賽馬資訊封鎖較鬆)"""
     url = "https://racing.hkjc.com/racing/information/Chinese/Racing/LocalResults.aspx"
     headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
     try:
@@ -20,10 +19,7 @@ def get_hkjc_tt_data():
         
         date_tag = soup.find(lambda tag: tag.name == "span" and "賽事日期" in tag.text)
         if date_tag:
-            web_date_text = date_tag.get_text()
-            if today_str not in web_date_text:
-                print(f"賽馬：今日 ({today_str}) 唔係賽馬日。")
-                return None
+            if today_str not in date_tag.get_text(): return None
         else: return None
 
         all_tds = soup.find_all('td')
@@ -31,47 +27,54 @@ def get_hkjc_tt_data():
             if "三T" == td.get_text(strip=True):
                 nums = all_tds[i+1].get_text(strip=True).replace(' ', '')
                 div = all_tds[i+2].get_text(strip=True)
-                if div == "-": return "⏳ 今日有賽馬，但三T派彩計算中..."
+                if div == "-": return "⏳ 三T派彩計算中..."
                 return f"🏇 *今日三T結果*\n━━━━━━━━━━━━\n✅ 組合：{nums}\n💰 派彩：HK$ {div}"
-        return None
-    except Exception as e:
-        print(f"三T爬蟲出錯: {e}")
-        return None
+    except: return None
 
 def get_mark_six_data():
-    """爬取六合彩結果 (使用官方數據 API)"""
-    # 呢個係馬會官方數據來源，回傳 JSON，最穩定且唔易被封
-    url = "https://is.hkjc.com/jcbw/static/statistics/mark6/mark6_result_ch.js"
-    headers = {'User-Agent': 'Mozilla/5.0'}
+    """爬取六合彩 (改用第三方 852.com 數據源，防止 GitHub 被封)"""
+    url = "https://www.852.com/mark6/"
+    headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
     try:
         r = requests.get(url, headers=headers, timeout=20)
-        # 由於呢個係 .js 檔案，內容格式係 "var ... = {...};"
-        # 我哋需要用正則表達式抽取出裡面嘅 JSON 部分
-        content = r.text
-        
-        # 搜尋日期
-        draw_date_match = re.search(r'"date":"(\d{2}/\d{2}/\d{4})"', content)
-        draw_date = draw_date_match.group(1) if draw_date_match else ""
-        print(f"六合彩偵測到日期: {draw_date}")
+        r.encoding = 'utf-8'
+        soup = BeautifulSoup(r.text, 'html.parser')
 
+        # 1. 搵日期
         today_str = datetime.now().strftime('%d/%m/%Y')
+        # 搜尋包含 DD/MM/YYYY 格式嘅文字
+        page_text = soup.get_text()
+        date_match = re.search(r'(\d{2}/\d{2}/\d{4})', page_text)
+        draw_date = date_match.group(1) if date_match else ""
+        print(f"第三方網頁日期: {draw_date}")
+
         if today_str != draw_date:
-            print(f"六合彩：今日 ({today_str}) 唔係開獎日。")
+            print(f"今日 ({today_str}) 非開獎日或第三方網頁未更新。")
             return None
 
-        # 搜尋號碼 (no1, no2... no6 + sno)
-        no1 = re.search(r'"no1":"(\d+)"', content).group(1)
-        no2 = re.search(r'"no2":"(\d+)"', content).group(1)
-        no3 = re.search(r'"no3":"(\d+)"', content).group(1)
-        no4 = re.search(r'"no4":"(\d+)"', content).group(1)
-        no5 = re.search(r'"no5":"(\d+)"', content).group(1)
-        no6 = re.search(r'"no6":"(\d+)"', content).group(1)
-        sno = re.search(r'"sno":"(\d+)"', content).group(1)
+        # 2. 搵號碼
+        # 第三方網頁通常用唔同嘅 class 顯示波色，我哋搵連續 7 個數字
+        balls = []
+        # 搵所有標記為號碼嘅標籤 (通常係 ball 或 no class)
+        all_spans = soup.find_all(['span', 'div'])
+        for s in all_spans:
+            txt = s.get_text(strip=True)
+            if txt.isdigit() and 1 <= int(txt) <= 49:
+                balls.append(txt)
         
-        nums = [no1, no2, no3, no4, no5, no6]
-        return f"🔮 *今日六合彩開獎*\n━━━━━━━━━━━━\n⚪️ 號碼：{', '.join(nums)}\n🔴 特別號：{sno}"
+        # 排除重複號碼
+        unique_balls = []
+        for b in balls:
+            if b not in unique_balls: unique_balls.append(b)
+        
+        if len(unique_balls) >= 7:
+            nums = unique_balls[:6]
+            s_no = unique_balls[6]
+            return f"🔮 *今日六合彩開獎*\n━━━━━━━━━━━━\n⚪️ 號碼：{', '.join(nums)}\n🔴 特別號：{s_no}"
+        
+        return None
     except Exception as e:
-        print(f"六合彩 API 出錯: {e}")
+        print(f"第三方數據出錯: {e}")
         return None
 
 def send_to_telegram(text):
@@ -83,7 +86,6 @@ def send_to_telegram(text):
 if __name__ == "__main__":
     print(f"--- 執行中 (香港: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}) ---")
     
-    # 執行檢查
     tt = get_hkjc_tt_data()
     if tt: send_to_telegram(tt)
     
