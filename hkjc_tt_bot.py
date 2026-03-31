@@ -3,8 +3,8 @@ import time
 
 # --- 設定區域 ---
 # 填入你剛才測試成功的 Token 和 Chat ID
-TELEGRAM_TOKEN = '你的_BOT_TOKEN'
-CHAT_ID = '你的_CHAT_ID'
+TELEGRAM_TOKEN = '8798203927:AAFVFSrU-vaKkIibl9rK5UMr_Ibvte5KVRc'
+CHAT_ID = '8735830443'
 
 # 馬會六合彩 JSON 來源 (這是目前最通用的路徑)
 LOTTERY_URL = "https://bet.hkjc.com/contentserver/jcbw/cmc/last30draws.json"
