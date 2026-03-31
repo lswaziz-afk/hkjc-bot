@@ -1,32 +1,30 @@
-name: HKJC Assistant Bot
+name: HKJC Bot Run
 
 on:
+  push:
+    branches: [ main ]  # 當你 commit 程式碼時會自動行一次
   schedule:
-    # 每日香港時間 22:15 (UTC 14:15)
-    - cron: '15 14 * * *'
-  workflow_dispatch: 
-
-env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-  TZ: Asia/Hong_Kong  # 強制系統使用香港時區
+    - cron: '30 15 * * *' # 每日香港時間 23:30 執行 (UTC 15:30)
+  workflow_dispatch:      # 俾你喺 GitHub 網頁手動撳掣執行
 
 jobs:
-  build:
+  run-task:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - name: 提取程式碼
+        uses: actions/checkout@v3
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - name: 設定 Python 環境
+        uses: actions/setup-python@v4
         with:
-          python-version: '3.11'
+          python-version: '3.9'
 
-      - name: Install dependencies
-        run: pip install requests beautifulsoup4
+      - name: 安裝必要組件
+        run: pip install requests
 
-      - name: Run Python script
+      - name: 執行程式
         env:
-          TG_TOKEN: ${{ secrets.TG_TOKEN }}
-          TG_CHAT_ID: ${{ secrets.TG_CHAT_ID }}
+          # 這裡會讀取你之前在 GitHub Settings 設好的 Secrets
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          CHAT_ID: ${{ secrets.CHAT_ID }}
         run: python hkjc_tt_bot.py
