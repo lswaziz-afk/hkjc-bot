@@ -2,9 +2,13 @@ import os
 import requests
 import time
 
-# 讀取環境變數 (GitHub Secrets)
+# 這裡括號內的字串，必須跟 YAML 檔中 env: 下面的左邊名稱一模一樣
 TOKEN = os.getenv('TELEGRAM_TOKEN')
 CHAT_ID = os.getenv('CHAT_ID')
+
+# 調試用：如果真的抓不到，GitHub Log 會印出這句
+if not TOKEN or not CHAT_ID:
+    print("❌ 錯誤：GitHub 環境變數讀取失敗，請檢查 YAML 檔的 env 設定")
 
 def get_data(url):
     headers = {
