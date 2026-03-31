@@ -23,48 +23,25 @@ def get_hkjc_tt_data():
     except: return None
 
 def get_mark_six_data():
-    """六合彩 (明報/東網 暴力執數版 - 完全放棄日期檢查)"""
-    # 呢個係東網專門整畀 App 用嘅數據源，通常係最更新且唔封 IP
+    """六合彩 (東網數據源 + 嚴格日期檢查)"""
     url = "https://on.cc/fe/m6/data/m6_data.json"
     headers = {'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 15_0 like Mac OS X)'}
-    
     try:
-        # 1. 試東網 JSON
         r = requests.get(url, headers=headers, timeout=15)
         if r.status_code == 200:
             data = r.json()
-            nums = data.get('result', '').split(',')
-            s_no = data.get('special', '')
-            if len(nums) >= 6:
+            draw_date = data.get('drawDate', '') # 格式通常係 2026/03/31
+            today_f1 = datetime.now().strftime('%Y/%m/%d')
+            
+            # 【核心守門口】只有日期 match 今日，先至發送訊息
+            if today_f1 == draw_date:
+                nums = data.get('result', '').split(',')
+                s_no = data.get('special', '')
                 return f"🔮 *今日六合彩開獎*\n━━━━━━━━━━━━\n⚪️ 號碼：{', '.join(nums[:6])}\n🔴 特別號：{s_no}"
-
-        # 2. 保底：如果 JSON 唔得，試明報嘅純文字版
-        r_mp = requests.get("https://news.mingpao.com/pns/%E5%85%AD%E5%90%88%E5%BD%A9/marksix", headers=headers, timeout=15)
-        # 直接喺成頁嘅 Source Code 入面搵符合「6個數字+1個特別號」嘅 Pattern
-        # 截圖見到：9, 18, 19, 20, 28, 32 + 44
-        content = r_mp.text
-        # 搵所有 1-49 嘅數字
-        all_nums = re.findall(r'\b\d{1,2}\b', content)
-        balls = [n for n in all_nums if 1 <= int(n) <= 49]
-        
-        # 去重執前 7 個
-        res = []
-        for b in balls:
-            if b not in res: res.append(b)
-            if len(res) == 7: break
-            
-        if len(res) >= 7:
-            # 攞今日日期嘅唔同寫法
-            today_f1 = datetime.now().strftime('%Y/%m/%d') # 2026/03/31
-            today_f2 = datetime.now().strftime('%d/%m/%Y') # 31/03/2026
-            
-            # 只有喺內容見到今日日期，或者確信係新數據先 Send
-            if today_f1 in content or today_f2 in content or "2026" in content:
-                return f"🔮 *今日六合彩開獎*\n━━━━━━━━━━━━\n⚪️ 號碼：{', '.join(res[:6])}\n🔴 特別號：{res[6]}"
-        
+            else:
+                print(f"今日 ({today_f1}) 非開獎日，最新數據日期為: {draw_date}")
         return None
-    except Exception as e:
-        print(f"DEBUG: Error {e}")
+    except:
         return None
 
 def send_to_telegram(text):
