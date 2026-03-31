@@ -54,8 +54,14 @@ def get_mark_six_data():
             if len(res) == 7: break
             
         if len(res) >= 7:
-            return f"🔮 *今日六合彩開獎 (保底)*\n━━━━━━━━━━━━\n⚪️ 號碼：{', '.join(res[:6])}\n🔴 特別號：{res[6]}"
+            # 攞今日日期嘅唔同寫法
+            today_f1 = datetime.now().strftime('%Y/%m/%d') # 2026/03/31
+            today_f2 = datetime.now().strftime('%d/%m/%Y') # 31/03/2026
             
+            # 只有喺內容見到今日日期，或者確信係新數據先 Send
+            if today_f1 in content or today_f2 in content or "2026" in content:
+                return f"🔮 *今日六合彩開獎*\n━━━━━━━━━━━━\n⚪️ 號碼：{', '.join(res[:6])}\n🔴 特別號：{res[6]}"
+        
         return None
     except Exception as e:
         print(f"DEBUG: Error {e}")
