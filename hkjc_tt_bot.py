@@ -1,5 +1,4 @@
 import requests
-from bs4 import BeautifulSoup
 import os
 import re
 from datetime import datetime
@@ -17,62 +16,49 @@ def get_hkjc_tt_data():
         r.encoding = 'utf-8'
         today = datetime.now().strftime('%d/%m/%Y')
         if today in r.text:
-            soup = BeautifulSoup(r.text, 'html.parser')
-            all_tds = soup.find_all('td')
-            for i, td in enumerate(all_tds):
-                if "三T" == td.get_text(strip=True):
-                    return f"🏇 *今日三T結果*\n━━━━━━━━━━━━\n✅ 組合：{all_tds[i+1].get_text(strip=True)}\n💰 派彩：HK$ {all_tds[i+2].get_text(strip=True)}"
+            # 簡單 Regex 執三T數據
+            res = re.findall(r'三T.*?<td>(.*?)</td>.*?<td>([\d,]+)</td>', r.text, re.S)
+            if res:
+                return f"🏇 *今日三T結果*\n━━━━━━━━━━━━\n✅ 組合：{res[0][0].strip()}\n💰 派彩：HK$ {res[0][1].strip()}"
     except: return None
 
 def get_mark_six_data():
-    """六合彩 (明報 - 暴力抓取版)"""
-    url = "https://news.mingpao.com/pns/%E5%85%AD%E5%90%88%E5%BD%A9/marksix"
-    headers = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-        'Referer': 'https://news.mingpao.com/'
-    }
+    """六合彩 (明報/東網 暴力執數版 - 完全放棄日期檢查)"""
+    # 呢個係東網專門整畀 App 用嘅數據源，通常係最更新且唔封 IP
+    url = "https://on.cc/fe/m6/data/m6_data.json"
+    headers = {'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 15_0 like Mac OS X)'}
+    
     try:
-        r = requests.get(url, headers=headers, timeout=20)
-        r.encoding = 'utf-8'
-        soup = BeautifulSoup(r.text, 'html.parser')
-        
-        # 1. 放寬日期檢查：只要今日嘅「日」(31) 有出現喺網頁就繼續
-        day_str = datetime.now().strftime('%d')
-        if day_str not in soup.get_text():
-            print(f"DEBUG: 網頁文字未見 '{day_str}' 號，可能未更新。")
-            # 保底：如果真係搵唔到日期，但你想強行試吓執波，可以註解下面呢行
-            # return None 
+        # 1. 試東網 JSON
+        r = requests.get(url, headers=headers, timeout=15)
+        if r.status_code == 200:
+            data = r.json()
+            nums = data.get('result', '').split(',')
+            s_no = data.get('special', '')
+            if len(nums) >= 6:
+                return f"🔮 *今日六合彩開獎*\n━━━━━━━━━━━━\n⚪️ 號碼：{', '.join(nums[:6])}\n🔴 特別號：{s_no}"
 
-        # 2. 抓取所有 1-49 嘅波 (優先搵 alt 屬性)
-        balls = []
-        # 搵 <img> 嘅 alt
-        for img in soup.find_all('img', alt=True):
-            a = img['alt'].strip()
-            if a.isdigit() and 1 <= int(a) <= 49:
-                balls.append(a)
+        # 2. 保底：如果 JSON 唔得，試明報嘅純文字版
+        r_mp = requests.get("https://news.mingpao.com/pns/%E5%85%AD%E5%90%88%E5%BD%A9/marksix", headers=headers, timeout=15)
+        # 直接喺成頁嘅 Source Code 入面搵符合「6個數字+1個特別號」嘅 Pattern
+        # 截圖見到：9, 18, 19, 20, 28, 32 + 44
+        content = r_mp.text
+        # 搵所有 1-49 嘅數字
+        all_nums = re.findall(r'\b\d{1,2}\b', content)
+        balls = [n for n in all_nums if 1 <= int(n) <= 49]
         
-        # 搵 <span> 或 <li> 入面嘅純數字 (長度 1-2 位)
-        for tag in soup.find_all(['span', 'li', 'div']):
-            t = tag.get_text(strip=True)
-            if t.isdigit() and 1 <= int(t) <= 49 and len(t) <= 2:
-                balls.append(t)
-
-        # 3. 執波邏輯：明報截圖係 9, 18, 19, 20, 28, 32 + 44
-        # 我哋攞「第一組」連續出現嘅 7 個唔同數字
-        res_list = []
+        # 去重執前 7 個
+        res = []
         for b in balls:
-            if b not in res_list:
-                res_list.append(b)
-            if len(res_list) == 7:
-                break
-        
-        if len(res_list) >= 7:
-            return f"🔮 *今日六合彩開獎 (明報)*\n━━━━━━━━━━━━\n⚪️ 號碼：{', '.join(res_list[:6])}\n🔴 特別號：{res_list[6]}"
-        
-        print(f"DEBUG: 執到嘅數字唔夠 7 個: {res_list}")
+            if b not in res: res.append(b)
+            if len(res) == 7: break
+            
+        if len(res) >= 7:
+            return f"🔮 *今日六合彩開獎 (保底)*\n━━━━━━━━━━━━\n⚪️ 號碼：{', '.join(res[:6])}\n🔴 特別號：{res[6]}"
+            
         return None
     except Exception as e:
-        print(f"Error: {e}")
+        print(f"DEBUG: Error {e}")
         return None
 
 def send_to_telegram(text):
@@ -81,7 +67,9 @@ def send_to_telegram(text):
                   data={'chat_id': CHAT_ID, 'text': text, 'parse_mode': 'Markdown'})
 
 if __name__ == "__main__":
+    print(f"--- 執行中 (香港: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}) ---")
     tt = get_hkjc_tt_data()
     if tt: send_to_telegram(tt)
     ms = get_mark_six_data()
     if ms: send_to_telegram(ms)
+    print("--- 執行完畢 ---")
