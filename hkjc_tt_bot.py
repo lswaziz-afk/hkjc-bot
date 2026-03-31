@@ -32,54 +32,64 @@ def get_hkjc_tt_data():
     except: return None
 
 def get_mark_six_data():
-    """爬取六合彩 (改用東網 on.cc 數據源)"""
-    # 東網嘅六合彩結果頁面非常穩定
-    url = "https://hk.on.cc/hk/bkn/cnt/news/20210105/bkn-20210105000041285-0105_00822_001.html" 
-    # 註：東網通常用一個固定 ID 頁面顯示即時結果
-    # 如果上面唔得，我哋改用佢嘅即時新聞列表搜尋
-    url = "https://hk.on.cc/fe/m6/" 
-    
-    headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
+    """爬取六合彩 (東網通用掃描版)"""
+    # 呢個網址係東網專門擺放六合彩資訊嘅地方
+    url = "https://hk.on.cc/fe/m6/"
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 14_8 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/14.1.2 Mobile/15E148 Safari/604.1',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8'
+    }
     try:
         r = requests.get(url, headers=headers, timeout=20)
         r.encoding = 'utf-8'
-        soup = BeautifulSoup(r.text, 'html.parser')
-
-        # 1. 檢查日期
-        today_str = datetime.now().strftime('%d/%m/%Y')
-        page_text = soup.get_text()
+        content = r.text
         
-        # 東網日期格式有時係 2026年03月31日
-        today_c = datetime.now().strftime('%Y年%m月%d日')
+        # 1. 檢查日期 (搵 2026-03-31 或 31/03/2026 或 31-03-2026)
+        today = datetime.now()
+        date_patterns = [
+            today.strftime('%d/%m/%Y'),
+            today.strftime('%Y-%m-%d'),
+            today.strftime('%Y年%m月%d日').replace('年0', '年').replace('月0', '月') # 處理 2026年3月31日
+        ]
         
-        if (today_str not in page_text) and (today_c not in page_text):
-            print(f"東網未偵測到今日 ({today_str}) 嘅結果。")
+        found_date = False
+        for p in date_patterns:
+            if p in content:
+                print(f"DEBUG: 搵到日期匹配: {p}")
+                found_date = True
+                break
+        
+        if not found_date:
+            print(f"DEBUG: 東網網頁內容尚未更新今日日期。")
+            # 為了測試，如果日期不符但你想看結果，可以把下面 return None 註解掉
             return None
 
-        # 2. 搵號碼 (東網通常會標記球號)
-        balls = []
-        # 東網嘅波色球 class 通常好明顯
-        ball_elements = soup.find_all(class_=re.compile(r'ball|number|markSix', re.I))
-        for b in ball_elements:
-            t = b.get_text(strip=True)
-            if t.isdigit() and 1 <= int(t) <= 49:
-                balls.append(t)
+        # 2. 搵號碼 (暴力掃描所有 1-49 嘅數字)
+        # 喺東網 m6 頁面，號碼通常被包喺 <span class="ball_red"> 等標籤
+        soup = BeautifulSoup(content, 'html.parser')
+        ball_elements = soup.find_all(lambda tag: tag.name in ['span', 'div', 'td'] and tag.get_text(strip=True).isdigit())
         
-        # 如果搵唔到 class，直接用 Regex 喺文字入面搵連續數字
-        if not balls:
-            # 搵類似「開獎號碼為：1, 2, 3...」嘅字眼
-            nums_match = re.findall(r'\b\d{1,2}\b', page_text)
-            balls = [n for n in nums_match if 1 <= int(n) <= 49]
-
+        potential_numbers = []
+        for b in ball_elements:
+            val = b.get_text(strip=True)
+            if val.isdigit() and 1 <= int(val) <= 49:
+                potential_numbers.append(val)
+        
+        # 排除重複並保持順序
+        balls = []
+        for n in potential_numbers:
+            if n not in balls:
+                balls.append(n)
+        
         if len(balls) >= 7:
-            # 攞最後一次出現嘅 7 個波 (通常最新結果喺最頂)
-            nums = balls[:6]
+            # 通常最新一期嘅 7 個波會最先出現
+            res_nums = balls[:6]
             s_no = balls[6]
-            return f"🔮 *今日六合彩開獎*\n━━━━━━━━━━━━\n⚪️ 號碼：{', '.join(nums)}\n🔴 特別號：{s_no}"
+            return f"🔮 *今日六合彩開獎*\n━━━━━━━━━━━━\n⚪️ 號碼：{', '.join(res_nums)}\n🔴 特別號：{s_no}"
         
         return None
     except Exception as e:
-        print(f"東網數據出錯: {e}")
+        print(f"東網掃描出錯: {e}")
         return None
 
 def send_to_telegram(text):
