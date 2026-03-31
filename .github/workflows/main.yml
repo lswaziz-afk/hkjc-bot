@@ -1,0 +1,29 @@
+name: HKJC Bot Daily Run
+
+on:
+  schedule:
+    - cron: '30 14 * * *' # 每天香港時間晚上 10:30 執行 (UTC 14:30)
+  workflow_dispatch:      # 允許手動執行測試
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.9'
+
+      - name: Install dependencies
+        run: |
+          pip install requests
+
+      - name: Run Bot
+        env:
+          # 這兩行是重點！將 Secret 轉為程式能讀到的環境變數
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          CHAT_ID: ${{ secrets.CHAT_ID }}
+        run: python hkjc_tt_bot.py
