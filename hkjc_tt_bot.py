@@ -50,10 +50,11 @@ def get_hkjc_tt_data():
         return None
 
 def get_mark_six_data():
-    """爬取六合彩結果 (HTML 網頁版，比 JSON 更穩定)"""
+    """爬取六合彩結果 (終極強化版 - 解決標籤找不到問題)"""
     url = "https://bet.hkjc.com/lottery/results/default.aspx?lang=ch"
     headers = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+        'Referer': 'https://bet.hkjc.com/'
     }
     try:
         r = requests.get(url, headers=headers, timeout=20)
@@ -63,34 +64,58 @@ def get_mark_six_data():
         # 1. 獲取今日日期
         today_str = datetime.now().strftime('%d/%m/%Y')
         
-        # 2. 檢查攪珠日期
-        # 馬會 HTML 結構中，日期通常在 class="drawDate" 或特定 td 內
-        date_container = soup.find('td', string=lambda t: t and '攪珠日期' in t)
-        if date_container:
-            # 攞下一格 td 嘅內容
-            draw_date_text = date_container.find_next('td').get_text(strip=True)
-            print(f"六合彩網頁日期: {draw_date_text}")
-            if False:  # today_str not in draw_date_text:
-                print(f"今日 ({today_str}) 唔係六合彩開獎日。")
-                return None
-        else:
-            print("找不到六合彩日期標籤")
+        # 2. 尋找攪珠日期 (改用更強大的搜尋邏輯)
+        draw_date_text = ""
+        # 遍歷所有 td，尋找包含「攪珠日期」字眼的單元格
+        for td in soup.find_all('td'):
+            if '攪珠日期' in td.get_text():
+                # 拿取該單元格或其下一個單元格的文字
+                next_td = td.find_next('td')
+                if next_td:
+                    draw_date_text = next_td.get_text(strip=True)
+                    break
+        
+        if not draw_date_text:
+            # 備用方案：直接在整個網頁文字裡找日期格式
+            import re
+            date_match = re.search(r'\d{2}/\d{2}/\d{4}', soup.get_text())
+            if date_match:
+                draw_date_text = date_match.group()
+
+        print(f"DEBUG: 六合彩網頁偵測到日期: {draw_date_text}")
+
+        if today_str not in draw_date_text:
+            print(f"今日 ({today_str}) 不是開獎日，網頁日期為: {draw_date_text}")
             return None
 
-        # 3. 抓取中獎號碼 (span class="no")
-        ball_elements = soup.find_all('span', class_=lambda x: x and 'no' in x)
-        if not ball_elements:
-            return None
-            
-        # 前 6 個係正獎，第 7 個係特別號碼
-        nums = [b.get_text(strip=True) for b in ball_elements[:6]]
-        s_no = ball_elements[6].get_text(strip=True)
+        # 3. 抓取中獎號碼
+        # 馬會的球號通常在 class 包含 'no' 或 'number' 的 span 裡
+        # 我們直接抓取所有可能是球號的 span
+        balls = []
+        # 嘗試幾種常見的 class 名稱
+        ball_elements = soup.find_all('span', class_=re.compile(r'no|number|ball', re.I))
         
-        return f"🔮 *今日六合彩開獎*\n━━━━━━━━━━━━\n⚪️ 號碼：{', '.join(nums)}\n🔴 特別號：{s_no}"
+        for b in ball_elements:
+            val = b.get_text(strip=True)
+            if val.isdigit() and 1 <= int(val) <= 49:
+                balls.append(val)
+        
+        # 由於網頁可能重複列出號碼，我們取前 7 個（6個正獎 + 1個特別號）
+        if len(balls) >= 7:
+            # 去重但保持順序（如果有重複的話）
+            seen = set()
+            unique_balls = [x for x in balls if not (x in seen or seen.add(x))]
+            
+            nums = unique_balls[:6]
+            s_no = unique_balls[6]
+            return f"🔮 *今日六合彩開獎*\n━━━━━━━━━━━━\n⚪️ 號碼：{', '.join(nums)}\n🔴 特別號：{s_no}"
+        
+        print("DEBUG: 找不到足夠的號碼球")
+        return None
     except Exception as e:
         print(f"六合彩爬蟲出錯: {e}")
         return None
-
+        
 def send_to_telegram(text):
     if not text: return
     api_url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
