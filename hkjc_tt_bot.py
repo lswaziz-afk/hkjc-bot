@@ -4,85 +4,73 @@ import os
 import re
 from datetime import datetime
 
-# 讀取 GitHub Secrets
 BOT_TOKEN = os.environ.get('TG_TOKEN')
 CHAT_ID = os.environ.get('TG_CHAT_ID')
 
 def get_hkjc_tt_data():
-    """爬取三T (馬會資訊網)"""
+    """三T (馬會資訊網)"""
     url = "https://racing.hkjc.com/racing/information/Chinese/Racing/LocalResults.aspx"
-    headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
+    headers = {'User-Agent': 'Mozilla/5.0'}
     try:
-        r = requests.get(url, headers=headers, timeout=20)
-        r.encoding = 'utf-8'
+        r = requests.get(url, headers=headers, timeout=15)
         soup = BeautifulSoup(r.text, 'html.parser')
-        today_str = datetime.now().strftime('%d/%m/%Y')
-        
-        date_tag = soup.find(lambda tag: tag.name == "span" and "賽事日期" in tag.text)
-        if date_tag and today_str in date_tag.get_text():
+        today = datetime.now().strftime('%d/%m/%Y')
+        if today in soup.get_text():
             all_tds = soup.find_all('td')
             for i, td in enumerate(all_tds):
                 if "三T" == td.get_text(strip=True):
-                    nums = all_tds[i+1].get_text(strip=True).replace(' ', '')
-                    div = all_tds[i+2].get_text(strip=True)
-                    if div == "-": return "⏳ 三T派彩計算中..."
-                    return f"🏇 *今日三T結果*\n━━━━━━━━━━━━\n✅ 組合：{nums}\n💰 派彩：HK$ {div}"
-        return None
+                    return f"🏇 *今日三T結果*\n━━━━━━━━━━━━\n✅ 組合：{all_tds[i+1].get_text(strip=True)}\n💰 派彩：HK$ {all_tds[i+2].get_text(strip=True)}"
     except: return None
 
 def get_mark_six_data():
-    """爬取六合彩 (東網首頁暴力掃描版 - 唔理日期直接搵波)"""
-    # 呢個係東網最核心、最唔會死嘅網址
-    url = "https://hk.on.cc/hk/news/index.html"
+    """六合彩 (Google 搜尋東網結果版)"""
+    # 模擬 Google 搜尋「東網 六合彩 今日日期」
+    today_query = datetime.now().strftime('%Y/%m/%d')
+    url = f"https://www.google.com/search?q=on.cc+六合彩+攪珠結果+{today_query}"
     headers = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'}
+    
     try:
         r = requests.get(url, headers=headers, timeout=20)
-        r.encoding = 'utf-8'
+        # Google 搜尋結果嘅摘要通常喺 <span> 埋面
         soup = BeautifulSoup(r.text, 'html.parser')
+        page_text = soup.get_text()
         
-        # 1. 搵所有 1-49 嘅數字
-        # 我哋唔再 check 日期，費事因為 2026/03/31 vs 31/03/2026 卡死
-        potential_balls = []
-        # 搵所有 <span>, <b>, <div> 入面嘅純數字
-        for tag in soup.find_all(['span', 'b', 'div']):
-            txt = tag.get_text(strip=True)
-            if txt.isdigit() and 1 <= int(txt) <= 49 and len(txt) <= 2:
-                potential_balls.append(txt)
+        # 喺全頁搵連續或者散開嘅數字
+        # 六合彩新聞通常格式：9、18、19、20、28、32及特別號碼44
+        # 我哋搵出所有 1-49 嘅數字
+        all_nums = re.findall(r'\b\d{1,2}\b', page_text)
+        balls = [n for n in all_nums if 1 <= int(n) <= 49]
         
-        # 2. 過濾號碼
-        # 東網首頁右邊嗰個「六合彩」box，號碼通常係連續出現嘅
-        # 我哋攞最後出現嗰 7 個數字 (通常最新結果喺最底或右邊資訊欄)
-        if len(potential_balls) >= 7:
-            # 攞最後 7 個波
-            res_balls = potential_balls[-7:]
+        # 排除重複，攞前 7 個
+        unique_balls = []
+        for b in balls:
+            if b not in unique_balls:
+                unique_balls.append(b)
+        
+        if len(unique_balls) >= 7:
+            # 根據 Google 摘要，通常最新結果會排最前
+            return f"🔮 *今日六合彩開獎*\n━━━━━━━━━━━━\n⚪️ 號碼：{', '.join(unique_balls[:6])}\n🔴 特別號：{unique_balls[6]}"
+        
+        # 如果 Google 唔得，試多次東網另一個 JSON 接口
+        print("DEBUG: Google 搜尋未果，試最後一個接口...")
+        r_api = requests.get("https://hk.on.cc/hk/bkn/cnt/news/index.html", headers=headers)
+        # 暴力執數
+        res = re.findall(r'(\d{1,2})[、,]\s?(\d{1,2})[、,]\s?(\d{1,2})[、,]\s?(\d{1,2})[、,]\s?(\d{1,2})[、,]\s?(\d{1,2}).*?(\d{1,2})', r_api.text)
+        if res:
+            return f"🔮 *今日六合彩開獎 (API)*\n━━━━━━━━━━━━\n⚪️ 號碼：{', '.join(res[0][:6])}\n🔴 特別號：{res[0][6]}"
             
-            # 檢查係咪真係號碼 (簡單去重，六合彩唔會重複)
-            if len(set(res_balls)) == 7:
-                nums = res_balls[:6]
-                s_no = res_balls[6]
-                return f"🔮 *今日六合彩開獎*\n━━━━━━━━━━━━\n⚪️ 號碼：{', '.join(nums)}\n🔴 特別號：{s_no}"
-        
-        print("DEBUG: 喺東網首頁搵唔到足夠嘅號碼球。")
         return None
     except Exception as e:
-        print(f"六合彩出錯: {e}")
+        print(f"Error: {e}")
         return None
 
 def send_to_telegram(text):
     if not text: return
-    api_url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
-    payload = {'chat_id': CHAT_ID, 'text': text, 'parse_mode': 'Markdown'}
-    requests.post(api_url, data=payload, timeout=15)
+    requests.post(f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage", 
+                  data={'chat_id': CHAT_ID, 'text': text, 'parse_mode': 'Markdown'})
 
 if __name__ == "__main__":
-    print(f"--- 執行中 (香港: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}) ---")
-    
-    # 三T
     tt = get_hkjc_tt_data()
     if tt: send_to_telegram(tt)
-    
-    # 六合彩
     ms = get_mark_six_data()
     if ms: send_to_telegram(ms)
-    
-    print("--- 執行完畢 ---")
