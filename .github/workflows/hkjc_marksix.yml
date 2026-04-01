@@ -1,0 +1,46 @@
+name: 🎱 六合彩自動通知
+
+on:
+  schedule:
+    # 六合彩每星期二、四、六或日晚上 9:30 開彩（HKT）
+    # UTC = HKT - 8 小時，即 UTC 13:30
+    # 喺 UTC 13:30、13:45、14:00 各執行一次，確保唔會錯過結果
+    - cron: "30 13 * * 2,4,6,0"
+    - cron: "45 13 * * 2,4,6,0"
+    - cron: "0 14 * * 2,4,6,0"
+    - cron: "15 14 * * 2,4,6,0"
+
+  # 手動觸發（測試用）
+  workflow_dispatch:
+
+jobs:
+  check-results:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 📥 Checkout 代碼
+        uses: actions/checkout@v4
+
+      - name: 📦 還原已發送記錄
+        uses: actions/cache@v4
+        with:
+          path: sent_marksix_results.json
+          key: sent-marksix-${{ github.run_id }}
+          restore-keys: |
+            sent-marksix-
+
+      - name: 🐍 安裝 Python 依賴
+        run: pip install requests beautifulsoup4
+
+      - name: 🚀 執行六合彩通知腳本
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID:   ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: python hkjc_marksix_telegram.py
+
+      - name: 💾 儲存已發送記錄
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: sent_marksix_results.json
+          key: sent-marksix-${{ github.run_id }}
