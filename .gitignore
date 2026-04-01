@@ -1,0 +1,5 @@
+sent_marksix_results.json
+__pycache__/
+*.pyc
+.env
+venv/
