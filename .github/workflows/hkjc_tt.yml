@@ -1,0 +1,44 @@
+name: 🏇 Triple Trio (三T) 自動通知
+
+on:
+  schedule:
+    # 香港賽馬通常下午 2 時後開始，三T係最後三場結算
+    # 沙田日賽：約下午 5-6 時結算（UTC 09:00-10:00）
+    # 快活谷夜賽：約晚上 10-11 時結算（UTC 14:00-15:00）
+    # 每 15 分鐘喺 HKT 14:00–23:00（UTC 06:00–15:00）執行
+    - cron: "0,15,30,45 6-15 * * *"
+
+  # 手動觸發（測試用）
+  workflow_dispatch:
+
+jobs:
+  check-tt-results:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: 📥 Checkout 代碼
+        uses: actions/checkout@v4
+
+      - name: 📦 還原已發送記錄
+        uses: actions/cache@v4
+        with:
+          path: sent_tt_results.json
+          key: sent-tt-${{ github.run_id }}
+          restore-keys: |
+            sent-tt-
+
+      - name: 🐍 安裝 Python 依賴
+        run: pip install requests beautifulsoup4
+
+      - name: 🚀 執行 Triple Trio 通知腳本
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID:   ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: python hkjc_tt_telegram.py
+
+      - name: 💾 儲存已發送記錄
+        if: always()
+        uses: actions/cache/save@v4
+        with:
+          path: sent_tt_results.json
+          key: sent-tt-${{ github.run_id }}
